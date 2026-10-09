@@ -1,17 +1,18 @@
 # Anime Analytics API
 
-A REST API that analyses the MyAnimeList anime dataset, built with Python, Pandas, NumPy and FastAPI. It exposes anime lookup, filtering and pagination, summary statistics, rankings, genre and type comparisons, engagement rates, metric distributions and Pareto (decile) concentration analysis.
+A tested, documented REST API for exploring the MyAnimeList anime dataset using Python, Pandas, NumPy and FastAPI. The application provides anime lookup, filtering, pagination, statistical summaries, rankings, genre and type comparisons, engagement metrics, metric distributions, and Pareto (decile) concentration analysis.
 
 [![CI](https://github.com/sunilnarayan419-ui/Anime-Analytics-API/actions/workflows/ci.yml/badge.svg)](https://github.com/sunilnarayan419-ui/Anime-Analytics-API/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-REST%20API-009688)
 ![Pandas](https://img.shields.io/badge/Pandas-Analytics-150458)
 ![Testing](https://img.shields.io/badge/Testing-Pytest-0A9EDC)
+![Documentation](https://img.shields.io/badge/Documentation-MkDocs%20Material-526CFE)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ## Contents
 
-1. [Problem statement](#1-problem-statement)
+1. [Overview](#1-overview)
 2. [Objectives](#2-objectives)
 3. [Dataset](#3-dataset)
 4. [Technology stack](#4-technology-stack)
@@ -21,63 +22,92 @@ A REST API that analyses the MyAnimeList anime dataset, built with Python, Panda
 8. [Configuration](#8-configuration)
 9. [Running the API](#9-running-the-api)
 10. [API reference](#10-api-reference)
-11. [Pareto analysis](#11-pareto-analysis)
-12. [Error handling](#12-error-handling)
-13. [Testing and code quality](#13-testing-and-code-quality)
-14. [Data limitations](#14-data-limitations)
-15. [Future extensions](#15-future-extensions)
-16. [License and attribution](#16-license-and-attribution)
+11. [Analytical methodology](#11-analytical-methodology)
+12. [Testing and code quality](#12-testing-and-code-quality)
+13. [Documentation with MkDocs](#13-documentation-with-mkdocs)
+14. [Building and validating documentation](#14-building-and-validating-documentation)
+15. [Publishing documentation](#15-publishing-documentation)
+16. [Data limitations](#16-data-limitations)
+17. [Future extensions](#17-future-extensions)
+18. [License and attribution](#18-license-and-attribution)
 
-## 1. Problem statement
+## 1. Overview
 
-Anime platforms hold thousands of titles with very different audience sizes. Understanding how ratings, popularity and engagement are distributed helps analysts study content popularity and discovery.
+Anime platforms contain thousands of titles with varying ratings, audience sizes, and engagement metrics. This project turns anime metadata into a structured REST API for querying the dataset and exploring statistical patterns.
 
-**How can raw anime metadata be turned into a reliable, tested REST API that delivers analytical insight into popularity, ratings, audience engagement and how concentrated those metrics are?**
+The application separates HTTP handling, business logic, data access, preprocessing, and analytical functions. It includes automated tests, configuration management, technical documentation, and a GitHub Actions continuous integration workflow.
+
+### Key features
+
+- Search, filter, sort, and paginate anime records.
+- Retrieve individual anime using MyAnimeList IDs.
+- Calculate dataset summaries and data-quality statistics.
+- Rank anime using supported numerical metrics.
+- Compare genres and anime types.
+- Analyze completion, drop, and favorite rates.
+- Examine metric distributions, percentiles, skewness, and kurtosis.
+- Analyze metric concentration through Pareto/decile grouping.
+- Validate requests and return structured error responses.
+- Run automated tests and code-quality checks.
+- Browse detailed technical documentation using MkDocs Material.
 
 ## 2. Objectives
 
-- Load, validate and clean the dataset reproducibly, with documented rules.
-- Implement the analysis in pure, independently testable Python functions.
-- Expose it through a validated, documented FastAPI application.
-- Provide filtering, sorting, pagination and identifier lookup.
-- Implement a generalised Pareto/decile analysis.
-- Cover the application with automated tests and maintain typed, linted code.
+- Load, validate, and clean the dataset reproducibly.
+- Implement independently testable analytical functions.
+- Expose analytics through a validated FastAPI application.
+- Provide filtering, sorting, pagination, and identifier lookup.
+- Implement generalized Pareto/decile analysis.
+- Maintain automated testing and code-quality checks.
+- Document the architecture, API behavior, analytical assumptions, and development workflow.
 
 ## 3. Dataset
 
-**MyAnimeList Database 2020**, file `anime.csv`: 17,562 anime, 35 columns.
+The application uses the **MyAnimeList Database 2020** dataset, specifically `anime.csv`, which contains 17,562 anime and 35 columns in the version used during development.
+
+Sources:
 
 - Original repository: https://github.com/Hernan4444/MyAnimelist-Database
-- Kaggle: https://www.kaggle.com/datasets/hernan4444/anime-recommendation-database-2020
+- Kaggle dataset: https://www.kaggle.com/datasets/hernan4444/anime-recommendation-database-2020
+- MyAnimeList: https://myanimelist.net/
 
-`anime.csv` is **not included** in this repository. Download it as described in [`data/readme.md`](data/readme.md), and place it at `data/anime.csv` or configure `DATA_PATH` to point to the file.
+The dataset is not included in this repository. Obtain it separately and place it at `data/anime.csv`, or configure `DATA_PATH` to point to the file.
 
-Check the original source's terms before redistributing the dataset.
+See [`data/readme.md`](data/readme.md) for dataset instructions.
 
-Column definitions, types and metric meanings are documented in [`docs/data_dictionary.md`](docs/data_dictionary.md). Cleaning rules and statistical definitions are documented in [`docs/analytical_methodology.md`](docs/analytical_methodology.md).
+### Data preprocessing
 
-In summary:
+The preprocessing pipeline applies documented rules:
 
 - `Unknown` and empty text values become missing values.
-- Impossible values, including negative counts, scores outside 0–10 and rank 0, become missing.
+- Impossible values, such as negative counts, scores outside 0–10, and rank 0, become missing.
 - Duplicate `MAL_ID` values retain their first row.
 - Missing values are not imputed.
 
-A summary of the cleaning results is returned by `GET /analytics/overview` under `data_quality`.
+Data-quality information is available through `GET /analytics/overview`.
+
+Detailed documentation:
+
+- [Data dictionary](docs/data_dictionary.md)
+- [Analytical methodology](docs/analytical_methodology.md)
+
+Review the dataset source's terms before redistributing the data.
 
 ## 4. Technology stack
 
 | Technology | Purpose |
 |---|---|
 | Python 3.11+ | Programming language |
-| FastAPI, Uvicorn | API framework and ASGI server |
-| Pydantic, pydantic-settings | Validation, response schemas and configuration |
-| Pandas, NumPy | Data processing and statistical analysis |
-| Pytest, HTTPX | Automated testing |
+| FastAPI | REST API framework |
+| Uvicorn | ASGI server |
+| Pydantic and pydantic-settings | Validation and configuration |
+| Pandas and NumPy | Data processing and analysis |
+| Pytest and HTTPX | Automated testing |
 | Ruff | Linting and formatting |
-| Mypy | Static type checking of `src/` |
+| Mypy | Static type checking |
 | uv | Optional dependency and lockfile management |
-| GitHub Actions | Automated CI testing and code-quality checks |
+| GitHub Actions | Continuous integration |
+| MkDocs Material | Technical documentation website |
 
 ## 5. Architecture
 
@@ -99,19 +129,22 @@ Preprocessing
   v
 anime.csv
 
-Services --> Analytics functions (pure Pandas/NumPy)
+Services
+  |
+  v
+Analytics functions (Pandas / NumPy)
 ```
 
-The CSV is read once at startup, cleaned and kept in memory. Requests do not repeatedly read the file.
+The CSV is loaded and processed at application startup, then kept in memory. Requests do not repeatedly read the file.
 
-Analytics functions operate on a DataFrame and are independent of HTTP handling.
+Analytical functions operate on DataFrames independently of HTTP handling. This separation supports testing, maintainability, and reuse.
 
-For further details, see [`docs/architecture.md`](docs/architecture.md).
+See [`docs/architecture.md`](docs/architecture.md) for the detailed architecture.
 
 ## 6. Repository structure
 
 ```text
-anime-analytics-api/
+Anime-Analytics-API/
 ├── README.md
 ├── LICENSE
 ├── .env.example
@@ -119,6 +152,7 @@ anime-analytics-api/
 ├── .gitattributes
 ├── pyproject.toml
 ├── uv.lock
+├── mkdocs.yml
 ├── .github/
 │   └── workflows/
 │       └── ci.yml
@@ -126,9 +160,13 @@ anime-analytics-api/
 │   ├── readme.md
 │   └── html/
 ├── docs/
+│   ├── index.md
+│   ├── getting-started.md
+│   ├── api-reference.md
 │   ├── architecture.md
+│   ├── analytical_methodology.md
 │   ├── data_dictionary.md
-│   └── analytical_methodology.md
+│   └── development.md
 ├── src/
 │   └── anime_analytics/
 │       ├── main.py
@@ -160,7 +198,9 @@ anime-analytics-api/
 └── tests/
 ```
 
-The `data/html/` directory contains supplementary sample files and is not required by the API. The actual CSV dataset is excluded from version control.
+The `data/html/` directory contains supplementary files and is not required by the API. The dataset CSV is excluded from version control.
+
+The MkDocs source files are maintained in `docs/`, while `mkdocs.yml` defines the documentation website's configuration and navigation. The generated website is written to `site/` and should not be committed.
 
 ## 7. Installation
 
@@ -179,7 +219,7 @@ python -m pip install --upgrade pip
 pip install -e ".[dev]"
 ```
 
-If PowerShell blocks environment activation, run:
+If PowerShell blocks activation, run:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
@@ -202,7 +242,7 @@ pip install -e ".[dev]"
 
 ### Using uv
 
-If uv is installed, use the committed lockfile:
+If uv is installed and the lockfile is up to date:
 
 ```bash
 uv sync --extra dev
@@ -210,7 +250,7 @@ uv sync --extra dev
 
 ### Download the dataset
 
-From the project root, download the CSV:
+From the project root:
 
 ```powershell
 New-Item -ItemType Directory -Force data | Out-Null
@@ -220,15 +260,13 @@ Invoke-WebRequest `
   -OutFile "data/anime.csv"
 ```
 
-Alternatively, obtain the dataset from the original source or Kaggle and place it at `data/anime.csv`.
-
-The dataset is intentionally excluded from this repository.
+Alternatively, download the dataset from its source and place it at `data/anime.csv`.
 
 ## 8. Configuration
 
-Settings are read from environment variables or a `.env` file in the working directory.
+The application reads configuration from environment variables or a local `.env` file.
 
-Create a local configuration file from the example:
+Create the file from the template:
 
 ```powershell
 Copy-Item .env.example .env
@@ -242,14 +280,14 @@ cp .env.example .env
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `APP_NAME` | `Anime Analytics API` | Application title shown in the API and documentation |
+| `APP_NAME` | `Anime Analytics API` | Application title |
 | `APP_ENV` | `development` | Environment label |
-| `DATA_PATH` | `data/anime.csv` | Path to the dataset; relative paths resolve from the working directory |
-| `LOG_LEVEL` | `INFO` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL` |
+| `DATA_PATH` | `data/anime.csv` | Dataset location |
+| `LOG_LEVEL` | `INFO` | Logging level |
 
-No API credentials are required for the documented functionality. The local `.env` file is excluded from version control.
+Supported logging levels are `DEBUG`, `INFO`, `WARNING`, `ERROR`, and `CRITICAL`.
 
-Do not commit actual credentials or other secrets if configuration requirements change.
+The local `.env` file should remain excluded from version control. Do not commit credentials or other secrets.
 
 ## 9. Running the API
 
@@ -259,198 +297,157 @@ From the project root, with the virtual environment activated:
 uvicorn anime_analytics.main:app --app-dir src --reload
 ```
 
-The API will be available at:
+The API is available locally at:
 
-- **Interactive API documentation:** http://127.0.0.1:8000/docs
-- **OpenAPI schema:** http://127.0.0.1:8000/openapi.json
-- **Health check:** http://127.0.0.1:8000/health
+- Interactive documentation: http://127.0.0.1:8000/docs
+- OpenAPI schema: http://127.0.0.1:8000/openapi.json
+- Health endpoint: http://127.0.0.1:8000/health
 
 The `--reload` option is intended for development.
 
-### Verify the health endpoint
+### Health check
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/health
 ```
 
-When the dataset is loaded successfully, the response should indicate a healthy application and the dataset count.
+When the dataset is loaded, the health endpoint should report a healthy status and the number of available anime records.
 
-If `data/anime.csv` is missing, the server can still start. The health endpoint reports a degraded status, and data-dependent endpoints return `503`.
+If the dataset is missing, the application can start in a degraded state. Data-dependent endpoints return `503`.
 
 ## 10. API reference
 
-Interactive documentation for all endpoints and parameters is available at `/docs`.
+The interactive API documentation at `/docs` exposes the request parameters and schemas generated by FastAPI.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
 | GET | `/` | API information |
-| GET | `/health` | Health check and dataset status |
-| GET | `/anime` | List anime with filtering, sorting and pagination |
-| GET | `/anime/{mal_id}` | Retrieve one anime by MyAnimeList ID |
-| GET | `/analytics/overview` | Summary statistics and data-quality counts |
-| GET | `/analytics/top-anime` | Rank anime by a selected metric |
-| GET | `/analytics/genres` | Aggregate a metric by genre |
+| GET | `/health` | Health and dataset status |
+| GET | `/anime` | Filtering, sorting, and pagination |
+| GET | `/anime/{mal_id}` | Retrieve anime by ID |
+| GET | `/analytics/overview` | Summary statistics and data quality |
+| GET | `/analytics/top-anime` | Rank anime by a metric |
+| GET | `/analytics/genres` | Aggregate metrics by genre |
 | GET | `/analytics/types` | Compare anime types |
-| GET | `/analytics/engagement` | Completion, drop and favorite rates by type |
-| GET | `/analytics/distribution/{metric}` | Statistical distribution of a metric |
-| GET | `/analytics/pareto` | Ranked-group concentration analysis |
+| GET | `/analytics/engagement` | Engagement analysis |
+| GET | `/analytics/distribution/{metric}` | Metric distributions |
+| GET | `/analytics/pareto` | Pareto/decile concentration analysis |
 
 ### Supported metrics
 
-Supported metrics include:
+The API supports:
 
-`Score`, `Episodes`, `Ranked`, `Popularity`, `Members`, `Favorites`, `Watching`, `Completed`, `On-Hold`, `Dropped`, `Plan to Watch` and `Score-1` through `Score-10`.
+`Score`, `Episodes`, `Ranked`, `Popularity`, `Members`, `Favorites`, `Watching`, `Completed`, `On-Hold`, `Dropped`, `Plan to Watch`, and `Score-1` through `Score-10`.
 
 Unsupported metric names return `422`.
 
-Pareto analysis accepts additive count metrics, not `Score`, `Ranked` or `Popularity`.
+Pareto analysis accepts additive count metrics rather than `Score`, `Ranked`, or `Popularity`.
 
-### `GET /anime`
+### Anime filtering
 
-Supported parameters:
+The `GET /anime` endpoint supports:
 
 | Parameter | Default | Description |
 |---|---|---|
 | `anime_type` | None | Exact anime type, case-insensitive |
 | `genre` | None | Exact genre name, case-insensitive |
-| `name` | None | Case-insensitive substring search across titles |
-| `min_score` | None | Minimum score, inclusive, between 0 and 10 |
-| `max_score` | None | Maximum score, inclusive, between 0 and 10 |
-| `sort_by` | `MAL_ID` | Supported field used for sorting |
-| `order` | `asc` | Sort direction: `asc` or `desc` |
-| `limit` | `20` | Number of records per page, from 1 to 100 |
-| `offset` | `0` | Number of records to skip; must be non-negative |
+| `name` | None | Case-insensitive substring search |
+| `min_score` | None | Minimum score, inclusive |
+| `max_score` | None | Maximum score, inclusive |
+| `sort_by` | `MAL_ID` | Supported sorting field |
+| `order` | `asc` | `asc` or `desc` |
+| `limit` | `20` | Page size, 1–100 |
+| `offset` | `0` | Non-negative number of records to skip |
 
-Filters combine with AND. Missing values sort last. Unscored anime do not match score filters.
-
-Example request:
-
-```http
-GET /anime?genre=Action&anime_type=TV&min_score=8&sort_by=Score&order=desc&limit=2
-```
-
-The response includes pagination metadata and an `items` array containing anime records.
-
-The dataset's column names are retained in returned records. `Genres` is represented as a list, and missing values are returned as `null`.
-
-### `GET /anime/{mal_id}`
-
-Returns one anime record for a valid MyAnimeList ID.
-
-If the ID is not found, the API returns `404`.
-
-### `GET /analytics/overview`
-
-Returns dataset-level summary statistics and data-quality information, including preprocessing results.
-
-### `GET /analytics/top-anime`
-
-Parameters:
-
-- `metric`: metric used for ranking; defaults to `Members`.
-- `limit`: number of results, from 1 to 100; defaults to `10`.
-- `order`: `asc` or `desc`. Defaults to descending, except `Ranked` and `Popularity`, where ascending order is used because lower ranks are better.
-
-Anime without a value for the selected metric are excluded.
+Filters combine using AND. Missing values sort last, and unscored anime do not match score filters.
 
 Example:
 
 ```http
-GET /analytics/top-anime?metric=Members&limit=3
+GET /anime?genre=Action&anime_type=TV&min_score=8&sort_by=Score&order=desc&limit=5
 ```
 
-### `GET /analytics/genres` and `GET /analytics/types`
-
-These endpoints aggregate a selected metric by genre or anime type.
-
-Supported parameters include:
-
-- `metric`
-- `sort_by`: `total`, `mean`, `median` or `anime_count`
-- `order`
-- `min_anime`
-- `limit` for the genre endpoint
-
-The default aggregation is `total` for count metrics and `mean` for `Score` and rank metrics.
-
-An anime is counted in full for every genre it lists, so genre totals can exceed the number of anime in the dataset. The `total` field is `null` for non-additive metrics.
-
-### `GET /analytics/distribution/{metric}`
-
-The `bins` parameter controls the number of histogram bins, from 1 to 100, with a default of 10.
-
-The response includes count, missing values, minimum, maximum, mean, median, standard deviation, percentiles, skewness, excess kurtosis and an equal-width histogram.
-
-### `GET /analytics/engagement`
-
-The `min_members` parameter excludes titles below a specified audience size.
-
-The response reports per-type title counts, total members and mean completion, drop and favorite rates. See the data dictionary for the metric definitions and limitations.
-
-## 11. Pareto analysis
-
-The Pareto endpoint studies how an additive metric is concentrated across ranked groups.
+### Anime ranking
 
 Example:
 
 ```http
-GET /analytics/pareto?metric=Completed&n=5
+GET /analytics/top-anime?metric=Members&limit=10
 ```
 
-The response contains:
+The default metric is `Members`. Missing values for the selected metric are excluded. `Ranked` and `Popularity` use ascending order by default because lower rank values indicate better rankings.
 
-- The selected metric.
-- Number of groups.
-- Number of observations.
-- Excluded missing observations.
-- Overall metric total.
-- Each group's proportion and cumulative proportion.
+### Genre and type analysis
 
-### Methodology
+The genre and type endpoints aggregate selected metrics using supported aggregation modes, including `total`, `mean`, `median`, and `anime_count`.
 
-Anime are ranked using `rank(method="first")`, giving tied values distinct ranks. The ranked observations are divided into `n` approximately equal-sized groups using `pd.qcut`.
+Genre totals can exceed the total number of anime because a title can belong to multiple genres.
 
-Each group's metric sum is divided by the overall total.
+### Metric distributions
 
-Groups are equal in **number of anime**, not in their share of the metric. The method does not assume that an 80/20 distribution must occur.
+Example:
 
-For the dataset examined during development, the top 10% of titles accounted for approximately 84% of recorded completions. This is a dataset-specific observation, not a universal property of anime popularity.
-
-### Using the analytical function directly
-
-```python
-from anime_analytics.analytics.pareto import calculate_pareto
-
-shares = calculate_pareto(df, "Completed", n=10)
+```http
+GET /analytics/distribution/Score?bins=10
 ```
 
-The function returns a pandas Series of group shares.
+The response includes descriptive statistics, percentiles, skewness, excess kurtosis, and an equal-width histogram.
 
-Edge cases, input validation and the exact algorithm are documented in [`docs/analytical_methodology.md`](docs/analytical_methodology.md).
+### Engagement analysis
 
-## 12. Error handling
+Example:
+
+```http
+GET /analytics/engagement?min_members=100
+```
+
+The endpoint reports title counts, total members, and mean completion, drop, and favorite rates by anime type.
+
+### Error handling
 
 | Status code | Meaning |
 |---|---|
-| `200` | Request succeeded. Pages past the end of the data return an empty `items` list. |
-| `400` | Parameters are valid, but the analysis cannot run, such as requesting more Pareto groups than observations. |
-| `404` | Unknown MyAnimeList ID. |
-| `422` | Invalid parameter, unsupported metric or sort field, incorrect type, out-of-range value or invalid score bounds. |
-| `503` | Dataset is not loaded. |
+| `200` | Request succeeded |
+| `400` | Analysis cannot be performed with the supplied valid parameters |
+| `404` | Anime ID not found |
+| `422` | Invalid parameter or unsupported value |
+| `503` | Dataset unavailable |
 
-Error responses use a `detail` field. Responses are designed not to expose stack traces or local file paths. Missing numeric values are represented as `null`, not `NaN` or `Infinity`.
+See [`docs/api-reference.md`](docs/api-reference.md) for the expanded endpoint guide.
 
-## 13. Testing and code quality
+## 11. Analytical methodology
 
-The project includes automated tests for analytical functions, API endpoints, configuration, repository behavior, preprocessing and integration with the real dataset.
+The project includes descriptive statistics, rankings, genre and type aggregation, engagement rates, distributions, and Pareto/decile concentration analysis.
 
-Run these commands from the project root with the virtual environment activated:
+### Pareto analysis
+
+Example:
+
+```http
+GET /analytics/pareto?metric=Completed&n=10
+```
+
+Anime are ranked using `rank(method="first")` and divided into approximately equal-sized groups using `pd.qcut`. Each group's metric sum is divided by the overall total.
+
+Groups are equal in the **number of anime**, not in their share of the metric. The method does not assume that an 80/20 distribution must occur.
+
+For the dataset examined during development, the top 10% of titles accounted for approximately 84% of recorded completions. This is a dataset-specific observation, not a universal property of anime popularity.
+
+The implementation handles invalid group counts, unsupported metrics, insufficient observations, missing values, negative values, all-zero data, and empty input according to the documented methodology.
+
+Detailed references:
+
+- [`docs/analytical_methodology.md`](docs/analytical_methodology.md)
+- [`docs/data_dictionary.md`](docs/data_dictionary.md)
+
+## 12. Testing and code quality
+
+Run the checks from the project root with the virtual environment activated.
+
+### Automated tests
 
 ```powershell
 python -m pytest -v
-ruff check .
-ruff format --check .
-mypy src/
 ```
 
 To run tests that do not require the real dataset:
@@ -459,64 +456,196 @@ To run tests that do not require the real dataset:
 python -m pytest -m "not integration"
 ```
 
-Integration tests use the real `anime.csv` and are skipped automatically when the dataset is unavailable at `DATA_PATH` or `data/anime.csv`.
+Integration tests use `anime.csv` and are skipped automatically when the dataset is unavailable, according to the project's test configuration.
+
+### Code quality
+
+```powershell
+ruff check .
+ruff format --check .
+mypy src/
+```
 
 ### Continuous integration
 
 GitHub Actions runs the configured CI workflow on pushes to `main` and pull requests targeting `main`.
 
-The workflow installs the project and development dependencies, runs the test suite and executes Ruff lint checks on GitHub's runner.
+The workflow installs the project and development dependencies, runs the test suite, and executes Ruff lint checks.
 
-**CI status:** [View GitHub Actions runs](https://github.com/sunilnarayan419-ui/Anime-Analytics-API/actions).
+- [GitHub Actions workflow](https://github.com/sunilnarayan419-ui/Anime-Analytics-API/actions)
+- [CI configuration](.github/workflows/ci.yml)
 
-The badge at the top of this README reflects the status of the configured workflow.
+The CI badge at the top of this README reflects the workflow status.
 
-### Test results
+Previously reported development results included 253 passing tests with the dataset present, 219 passing and 34 skipped without it, successful Ruff checks, and no Mypy issues in 27 source files. These are historical results, not a guarantee that every future commit will produce identical results.
 
-The original development run reported the following results with Python 3.13, pandas 3.0 and FastAPI 0.143:
+## 13. Documentation with MkDocs
 
-| Check | Previously reported result |
+The project uses **MkDocs Material** to organize its technical documentation into a searchable website with navigation, syntax-highlighted code blocks, and responsive presentation.
+
+### Documentation structure
+
+| File | Purpose |
 |---|---|
-| Pytest with `data/anime.csv` present | 253 passed |
-| Pytest without the dataset | 219 passed, 34 skipped |
-| `ruff check .` | All checks passed |
-| `ruff format --check .` | No files to reformat |
-| `mypy src/` | No issues in 27 source files |
+| `mkdocs.yml` | Site configuration, theme, and navigation |
+| `docs/index.md` | Documentation homepage |
+| `docs/getting-started.md` | Installation and local setup |
+| `docs/api-reference.md` | Endpoint guide and request examples |
+| `docs/architecture.md` | Application architecture |
+| `docs/analytical_methodology.md` | Statistical methods and assumptions |
+| `docs/data_dictionary.md` | Dataset fields and metric definitions |
+| `docs/development.md` | Testing, code quality, and development workflow |
 
-These figures describe the development run and should not be interpreted as the results of every subsequent commit. The current CI workflow's result is available in the GitHub Actions tab.
+The main `README.md` remains the repository's landing page. The MkDocs site provides a more structured guide for developers who need detailed instructions.
 
-Only `src/` is type-checked; tests are not annotated. Python 3.11 and 3.12 were not available in the original development environment, so those versions were not verified there.
+### Install documentation dependencies
 
-## 14. Data limitations
+Activate the project virtual environment and install MkDocs Material:
 
-- The dataset is a **2020/early-2021 snapshot**, not live data.
-- `Members`, `Completed` and related fields count MyAnimeList list entries, not unique viewers or streams.
-- The metrics reflect MyAnimeList's user base only.
-- Approximately 29% of titles in the examined dataset have no `Score`; these titles are excluded from score statistics rather than treated as zero.
-- `Popularity` and `Ranked` are ranks, with lower values indicating better ranks. They are not quantities and are not directly comparable to counts.
+```powershell
+python -m pip install mkdocs-material
+```
+
+If MkDocs Material has already been added to the project's development dependencies, install all development dependencies using:
+
+```powershell
+python -m pip install -e ".[dev]"
+```
+
+Verify the installation:
+
+```powershell
+mkdocs --version
+```
+
+### Preview locally
+
+From the repository root:
+
+```powershell
+mkdocs serve --dev-addr 127.0.0.1:8001
+```
+
+Open http://127.0.0.1:8001 in your browser.
+
+MkDocs watches the Markdown source files and rebuilds the preview when they change.
+
+### Documentation configuration
+
+The root-level `mkdocs.yml` defines the site name, repository links, Material theme, Markdown extensions, and navigation.
+
+The `docs/` directory contains the source Markdown files. The generated website is written to `site/`.
+
+The generated `site/` directory should be excluded from version control.
+
+## 14. Building and validating documentation
+
+Before publishing, validate the documentation independently of the API.
+
+### Strict build
+
+```powershell
+mkdocs build --strict
+```
+
+This generates the static website and treats MkDocs warnings as errors.
+
+Resolve missing navigation pages, invalid configuration, and other build warnings before publishing.
+
+### Inspect generated output
+
+```powershell
+Get-ChildItem .\site\
+```
+
+The output should include `index.html`, HTML pages for the navigation entries, and supporting static assets.
+
+### Final validation checklist
+
+- The local documentation website loads.
+- Every navigation item opens the correct page.
+- Existing architecture, methodology, and data dictionary content is preserved.
+- Code blocks, tables, and internal links render correctly.
+- Search works as expected.
+- `mkdocs build --strict` completes without warnings.
+- Backend tests and configured quality checks pass.
+- Generated `site/` files are not accidentally committed.
+
+## 15. Publishing documentation
+
+The documentation source can be committed to the main repository independently of publishing the website.
+
+### Commit documentation source
+
+```powershell
+git status
+git add mkdocs.yml docs/ pyproject.toml .gitignore
+git diff --cached --check
+git diff --cached --stat
+```
+
+Review the staged changes, then commit and push:
+
+```powershell
+git commit -m "Add MkDocs project documentation"
+git push origin main
+```
+
+Include only files that you have actually created or modified. Do not stage unrelated changes unintentionally.
+
+### Publish using GitHub Pages
+
+After the local documentation build passes, the site can be published to GitHub Pages.
+
+A manual deployment can be initiated with:
+
+```powershell
+mkdocs gh-deploy
+```
+
+This command builds the documentation and publishes it to the `gh-pages` branch, subject to the repository's permissions and deployment configuration.
+
+Ensure that GitHub Pages is configured to serve from the appropriate branch. Review the resulting deployment status in GitHub Actions.
+
+The intended documentation URL is:
+
+https://sunilnarayan419-ui.github.io/Anime-Analytics-API/
+
+**This URL is not evidence that the website is already published.** It becomes usable after the deployment succeeds and GitHub Pages is configured correctly.
+
+For automated publication, a separate GitHub Actions documentation workflow can build the site and deploy it when documentation changes are pushed. Keep the existing API CI workflow intact.
+
+## 16. Data limitations
+
+- The dataset is a 2020/early-2021 snapshot, not live data.
+- `Members`, `Completed`, and related fields count MyAnimeList list entries, not verified unique viewers or streams.
+- Metrics reflect the MyAnimeList user base only.
+- Approximately 29% of titles in the examined dataset have no score; these are excluded from score statistics rather than treated as zero.
+- `Popularity` and `Ranked` are ranks, not quantities, and are not directly comparable to counts.
 - Genre totals double-count multi-genre titles by design.
 - Correlation in aggregated data is not evidence of causation.
 - Results depend on the dataset version supplied to the application.
 
-## 15. Future extensions
+## 17. Future extensions
 
-The current version provides a tested, documented FastAPI backend for anime data exploration and statistical analytics.
+The current version provides a tested, documented FastAPI backend and a structured MkDocs documentation source.
 
-The following are potential future directions and are **not part of the current implementation**:
+Potential future improvements include:
 
-- **Containerization:** Package the application using Docker for reproducible deployment.
+- **Containerization:** Package the API using Docker for reproducible deployment.
 - **Persistent storage:** Introduce PostgreSQL and SQLAlchemy if database-backed storage becomes necessary.
 - **Advanced analytics:** Explore studio-level benchmarking and genre co-occurrence analysis.
 - **Recommendation systems:** Investigate content-based recommendations using anime synopsis similarity.
 - **Performance optimization:** Benchmark endpoint latency and throughput, then introduce caching where measurements justify it.
+- **Automated documentation deployment:** Publish the MkDocs site through a dedicated GitHub Actions workflow.
 
-These improvements can be evaluated independently according to their practical value and complexity.
+These are future directions, not claims about functionality already implemented.
 
-## 16. License and attribution
+## 18. License and attribution
 
 ### Code
 
-This project's code is released under the MIT License. See [`LICENSE`](LICENSE).
+The project's code is released under the MIT License. See [`LICENSE`](LICENSE).
 
 ### Dataset
 
@@ -526,4 +655,4 @@ The project uses the MyAnimeList Database 2020 dataset by Hernan4444, compiled f
 - MyAnimeList: https://myanimelist.net/
 - Kaggle dataset: https://www.kaggle.com/datasets/hernan4444/anime-recommendation-database-2020
 
-The dataset is third-party material and is **not covered by this project's MIT License**. Review the original source's terms before redistributing it.
+The dataset is third-party material and is not covered by this project's MIT License. Review the original source's terms before redistributing it.
