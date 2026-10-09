@@ -36,3 +36,7 @@ Thumbs.db
 data/*.csv
 *.zip
 !data/html/*.zip
+
+# MkDocs generated website
+/site/
+
