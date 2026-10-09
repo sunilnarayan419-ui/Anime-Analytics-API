@@ -1,3 +1,59 @@
+# Data
+
+This API analyses `anime.csv` from the **MyAnimeList Database 2020** dataset.
+
+## Getting `anime.csv`
+
+`anime.csv` (about 5.6 MB, 17,562 rows, 35 columns) is **not committed** to this
+repository (`data/*.csv` is git-ignored) and is not included in the delivered
+ZIP, because redistribution terms should be checked at the source first.
+
+Download it from one of these sources and place it at `data/anime.csv`:
+
+- Original repository: <https://github.com/Hernan4444/MyAnimelist-Database>
+  (file `data/anime.csv`)
+- Kaggle: <https://www.kaggle.com/datasets/hernan4444/anime-recommendation-database-2020>
+
+PowerShell:
+
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Hernan4444/MyAnimelist-Database/master/data/anime.csv" -OutFile "data/anime.csv"
+```
+
+bash:
+
+```bash
+curl -L -o data/anime.csv https://raw.githubusercontent.com/Hernan4444/MyAnimelist-Database/master/data/anime.csv
+```
+
+To keep the file elsewhere, set `DATA_PATH` (environment variable or `.env`):
+
+```text
+DATA_PATH=D:/datasets/anime.csv
+```
+
+Relative paths are resolved from the directory the server is started in.
+
+## What the application uses
+
+Only `anime.csv`. The file is read once at startup and cleaned in memory; the
+file on disk is never modified. The cleaning rules and column meanings are
+documented in [`docs/data_dictionary.md`](../docs/data_dictionary.md) and
+[`docs/analytical_methodology.md`](../docs/analytical_methodology.md).
+
+If the file is missing or invalid, the API still starts: `GET /health` reports
+`"status": "degraded"` and data endpoints return `503`.
+
+## Other files in this folder
+
+`html/` holds two sample archives of scraped MyAnimeList pages (`1.zip`,
+`5.zip`) that came with the upstream dataset. The API does **not** use them.
+
+The full upstream dataset description follows (kept for reference; the other
+CSV files it mentions are not used by this application).
+
+---
+
 # Files/folder description
 
 

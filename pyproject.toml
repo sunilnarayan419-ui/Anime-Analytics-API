@@ -4,23 +4,27 @@ build-backend = "hatchling.build"
 
 [project]
 name = "anime-analytics-api"
-version = "0.1.0"
+version = "1.0.0"
 description = "Anime analytics REST API built with FastAPI and Pandas"
+readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi",
-    "uvicorn[standard]",
-    "pandas",
-    "numpy",
-    "pydantic-settings",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "pydantic>=2.5",
+    "pydantic-settings>=2.2",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
-    "httpx",
-    "ruff",
-    "mypy",
+    "pytest>=8.0",
+    "httpx>=0.27",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pandas-stubs",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -29,11 +33,21 @@ packages = ["src/anime_analytics"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "-ra"
+markers = [
+    "integration: tests that need the real anime.csv dataset (skipped when absent)",
+]
 
 [tool.ruff]
 line-length = 88
 target-version = "py311"
 
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true

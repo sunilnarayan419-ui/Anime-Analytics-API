@@ -1,105 +1,67 @@
 """Metric distribution analysis."""
 
+from typing import Any, cast
+
+import numpy as np
 import pandas as pd
+
+from anime_analytics.analytics.metrics import numeric_series, validate_positive_int
+from anime_analytics.exceptions import AnalysisError
+
+MAX_BINS = 100
+PERCENTILES: tuple[int, ...] = (25, 50, 75, 90, 95, 99)
 
 
 def analyze_metric_distribution(
-    data: pd.DataFrame, metric_column: str, bins: int = 10
-) -> dict:
-    """
-    Analyze the distribution of a numeric metric.
+    data: pd.DataFrame,
+    metric_column: str,
+    bins: int = 10,
+) -> dict[str, Any]:
+    """Describe how the values of a metric are distributed.
 
-    Args:
-        data: Cleaned anime DataFrame.
-        metric_column: Column name containing numeric values.
-        bins: Number of bins for histogram analysis.
-
-    Returns:
-        Dictionary with distribution statistics and percentiles.
+    The histogram uses ``bins`` equal-width bins between the observed minimum
+    and maximum. Skewness is the bias-corrected sample skewness and kurtosis
+    is the bias-corrected *excess* kurtosis (0 for a normal distribution);
+    both are NaN when there are too few observations (fewer than 3 and 4).
 
     Raises:
-        ValueError: If column is not found or has no valid numeric data.
+        AnalysisError: If the column is unknown, has no valid values, or
+            ``bins`` is not an integer between 1 and ``MAX_BINS``.
     """
-    if metric_column not in data.columns:
-        raise ValueError(f"Unsupported metric: {metric_column}")
+    bins = validate_positive_int(bins, "bins")
+    if bins > MAX_BINS:
+        raise AnalysisError(f"bins must be at most {MAX_BINS}")
 
-    values = pd.to_numeric(data[metric_column], errors="coerce").dropna()
+    all_values = numeric_series(data, metric_column)
+    values = all_values.dropna()
 
     if values.empty:
-        raise ValueError(f"No valid numeric values for {metric_column}")
+        raise AnalysisError(f"No valid numeric values for {metric_column}")
 
-    # Calculate percentiles
-    percentiles = values.quantile([0.25, 0.5, 0.75, 0.9, 0.95, 0.99]).to_dict()
-
-    # Calculate histogram bins (using numpy if available, otherwise pandas)
-    try:
-        import numpy as np
-
-        hist, bin_edges = np.histogram(values, bins=bins)
-        bin_labels = [
-            f"{bin_edges[i]:.1f} - {bin_edges[i + 1]:.1f}"
-            for i in range(len(bin_edges) - 1)
-        ]
-        bin_counts = hist.tolist()
-    except ImportError:
-        # Fallback to pandas value_counts for bins
-        binned = pd.cut(values, bins=bins)
-        bin_counts = binned.value_counts().sort_index().tolist()
-        bin_labels = [str(interval) for interval in binned.cat.categories]
-
-    # Calculate skewness and kurtosis
-    try:
-        from scipy import stats
-
-        skewness = float(stats.skew(values))
-        kurtosis = float(stats.kurtosis(values))
-    except ImportError:
-        skewness = 0.0
-        kurtosis = 0.0
+    counts, edges = np.histogram(values.to_numpy(), bins=bins)
+    percentile_values = np.percentile(values.to_numpy(), PERCENTILES)
 
     return {
         "metric": metric_column,
-        "count": int(len(values)),
+        "count": int(values.count()),
+        "missing": int(len(all_values) - len(values)),
         "min": float(values.min()),
         "max": float(values.max()),
         "mean": float(values.mean()),
         "median": float(values.median()),
         "std": float(values.std()),
-        "percentiles": {f"p{p}": float(p) for p, v in percentiles.items()},
-        "histogram": {
-            "bins": bin_labels,
-            "counts": bin_counts,
+        "percentiles": {
+            f"p{level}": float(value)
+            for level, value in zip(PERCENTILES, percentile_values, strict=True)
         },
-        "skewness": skewness,
-        "kurtosis": kurtosis,
+        "skewness": float(cast(float, values.skew())),
+        "kurtosis": float(cast(float, values.kurt())),
+        "histogram": [
+            {
+                "lower": float(edges[i]),
+                "upper": float(edges[i + 1]),
+                "count": int(counts[i]),
+            }
+            for i in range(len(counts))
+        ],
     }
-
-
-def get_top_n_ranking(data: pd.DataFrame, metric_column: str, n: int = 10) -> pd.Series:
-    """
-    Get top N anime ranked by a specific metric.
-
-    Args:
-        data: Cleaned anime DataFrame.
-        metric_column: Column name containing numeric values.
-        n: Number of top entries to return.
-
-    Returns:
-        Series with MAL_ID as index and metric values as values, sorted descending.
-
-    Raises:
-        ValueError: If column is not found or n is invalid.
-    """
-    if metric_column not in data.columns:
-        raise ValueError(f"Unsupported metric: {metric_column}")
-
-    if not isinstance(n, int) or n < 1:
-        raise ValueError("n must be a positive integer")
-
-    # Convert to numeric, handling "Unknown" values
-    values = pd.to_numeric(data[metric_column], errors="coerce")
-
-    # Sort by metric value descending
-    ranked = values.sort_values(ascending=False)
-
-    return ranked.head(n)

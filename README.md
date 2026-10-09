@@ -1,625 +1,438 @@
 # Anime Analytics API
 
-**A production-oriented data analytics REST API built with Python, Pandas, and FastAPI.**
+A REST API that analyses the MyAnimeList anime dataset, built with Python,
+Pandas, NumPy and FastAPI. It exposes anime lookup, filtering and pagination,
+summary statistics, rankings, genre and type comparisons, engagement rates,
+metric distributions and Pareto (decile) concentration analysis.
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-REST%20API-009688)
 ![Pandas](https://img.shields.io/badge/Pandas-Analytics-150458)
 ![Pytest](https://img.shields.io/badge/Testing-Pytest-0A9EDC)
-![Status](https://img.shields.io/badge/Status-In%20Development-orange)
 
----
+## Contents
 
-## 1. Problem Statement
+1. [Problem statement](#1-problem-statement)
+2. [Objectives](#2-objectives)
+3. [Dataset](#3-dataset)
+4. [Technology stack](#4-technology-stack)
+5. [Architecture](#5-architecture)
+6. [Repository structure](#6-repository-structure)
+7. [Installation](#7-installation)
+8. [Configuration](#8-configuration)
+9. [Running the API](#9-running-the-api)
+10. [API reference](#10-api-reference)
+11. [Pareto analysis](#11-pareto-analysis)
+12. [Error handling](#12-error-handling)
+13. [Testing and code quality](#13-testing-and-code-quality)
+14. [Data limitations](#14-data-limitations)
+15. [Future extensions](#15-future-extensions)
+16. [License and attribution](#16-license-and-attribution)
 
-### Background
+## 1. Problem statement
 
-Anime platforms contain thousands of titles with varying audience sizes, ratings, popularity rankings, and completion statistics. Understanding how audience engagement is distributed across these titles can help analysts investigate content popularity, audience preferences, and opportunities for content discovery.
+Anime platforms hold thousands of titles with very different audience sizes.
+Understanding how ratings, popularity and engagement are distributed helps
+analysts study content popularity and discovery.
 
-The MyAnimeList Database 2020 dataset provides anime metadata and user engagement statistics that can be used to explore these patterns.
+**How can raw anime metadata be turned into a reliable, tested REST API that
+delivers analytical insight into popularity, ratings, audience engagement and
+how concentrated those metrics are?**
 
-### Core Problem
+## 2. Objectives
 
-**How can we transform raw anime metadata into a reliable, testable REST API that delivers meaningful analytical insights about anime popularity, ratings, audience engagement, and metric concentration?**
-
-This project addresses the problem by combining data preprocessing, statistical analysis, and backend engineering in a modular Python application.
-
-The API will allow users to retrieve anime records, filter and rank titles, inspect aggregated statistics, and perform Pareto or decile analysis through HTTP requests.
-
----
-
-## 2. Project Objectives
-
-- Build a reproducible data preprocessing pipeline.
-- Analyze anime metadata using Pandas and NumPy.
-- Develop a REST API using FastAPI.
-- Implement filtering, sorting, pagination, and identifier-based lookup.
-- Calculate descriptive statistics and genre-level summaries.
-- Implement generalized Pareto analysis using ranked quantile groups.
-- Validate request parameters and return consistent error responses.
-- Write automated unit and integration tests.
-- Document API contracts and analytical assumptions.
-- Maintain a modular, code-first repository without Jupyter notebooks.
-
----
+- Load, validate and clean the dataset reproducibly, with documented rules.
+- Implement the analysis in pure, independently testable Python functions.
+- Expose it through a validated, documented FastAPI application.
+- Provide filtering, sorting, pagination and identifier lookup.
+- Implement a generalised Pareto/decile analysis.
+- Cover everything with automated tests and keep the code typed and linted.
 
 ## 3. Dataset
 
-**Dataset:** MyAnimeList Database 2020
+**MyAnimeList Database 2020**, file `anime.csv`: 17,562 anime, 35 columns.
 
-- [Original dataset repository](https://github.com/Hernan4444/MyAnimelist-Database)
-- [Kaggle dataset page](https://www.kaggle.com/datasets/hernan4444/anime-recommendation-database-2020)
+- Original repository: <https://github.com/Hernan4444/MyAnimelist-Database>
+- Kaggle: <https://www.kaggle.com/datasets/hernan4444/anime-recommendation-database-2020>
 
-### Primary data source
+`anime.csv` is **not included** in this repository or the delivered ZIP;
+download it first, as described in [`data/README.md`](data/README.md), and place
+it at `data/anime.csv` (or point `DATA_PATH` at it). Check the source's terms
+before redistributing it.
 
-The initial version will use `anime.csv`, which contains anime metadata and audience statistics.
+Columns, types and the meaning of each metric are in
+[`docs/data_dictionary.md`](docs/data_dictionary.md). The cleaning rules and
+statistical definitions are in
+[`docs/analytical_methodology.md`](docs/analytical_methodology.md). In short:
+`Unknown` and empty text become missing values, impossible values (negative
+counts, a score outside 0–10, rank 0) become missing, duplicate `MAL_ID`s keep
+their first row, and **nothing is imputed**. A summary of what was changed is
+returned by `GET /analytics/overview` under `data_quality`.
 
-| Column | Analytical use |
+## 4. Technology stack
+
+| Technology | Use |
 |---|---|
-| `MAL_ID` | Unique anime identifier |
-| `Name` | Anime title |
-| `Score` | Reported rating |
-| `Genres` | Genre-based analysis |
-| `Type` | Format-based comparison |
-| `Episodes` | Episode count analysis |
-| `Studios` | Studio-level aggregation |
-| `Popularity` | Popularity ranking |
-| `Members` | Audience membership analysis |
-| `Favorites` | Favorite-count analysis |
-| `Watching` | Current watching activity |
-| `Completed` | Completion-count analysis |
-| `Dropped` | Dropped-title activity |
-| `On-Hold` | On-hold activity |
-| `Plan to Watch` | Planned viewing activity |
+| Python 3.11+ | Language |
+| FastAPI, Uvicorn | API framework and ASGI server |
+| Pydantic, pydantic-settings | Validation, response schemas, configuration |
+| Pandas, NumPy | Data handling and analysis |
+| Pytest, HTTPX | Tests (HTTPX backs FastAPI's `TestClient`) |
+| Ruff | Linting and formatting |
+| Mypy | Static typing of `src/` |
+| uv (optional) | Dependency locking (`uv.lock`) |
 
-Other files in the dataset may be introduced later if additional user-level or recommendation analyses become necessary.
-
-**Data handling rule:** Keep the raw dataset separate from the source code. Do not commit large datasets to Git unless their size and redistribution permissions have been checked.
-
----
-
-## 4. Project Scope
-
-### Phase 1 — Data Engineering
-
-Implement the preprocessing pipeline in ordinary Python modules.
-
-Responsibilities:
-
-- Load CSV data.
-- Validate required columns and data types.
-- Detect duplicate identifiers.
-- Handle missing and invalid values.
-- Validate numerical metrics.
-- Document cleaning decisions.
-- Provide a consistent data interface to the application.
-
-**Deliverable:** A reusable, tested data-loading and preprocessing module.
-
-### Phase 2 — Analytical Engine
-
-Implement independent Python functions for:
-
-- Summary statistics.
-- Metric distributions.
-- Top-anime rankings.
-- Genre-level aggregation.
-- Type-level comparisons.
-- Rating and engagement comparisons.
-- Pareto and decile analysis.
-
-Analytical functions must remain independent of HTTP request handling so they can be tested and reused without starting the API server.
-
-**Deliverable:** A modular analytical engine.
-
-### Phase 3 — FastAPI Application
-
-Expose the analytical functions through REST endpoints.
-
-The application should support:
-
-- Anime lookup by identifier.
-- Filtering by genre and type.
-- Sorting by supported metrics.
-- Pagination.
-- Descriptive statistics.
-- Genre summaries.
-- Metric distribution analysis.
-- Pareto analysis.
-
-**Deliverable:** A functioning REST API with validated inputs and documented responses.
-
-### Phase 4 — Testing and Reliability
-
-- Unit-test preprocessing and analytical functions.
-- Test API routes with HTTPX and FastAPI's test client.
-- Validate input constraints.
-- Test missing identifiers and unsupported metrics.
-- Test Pareto grouping with duplicate values.
-- Handle empty datasets and zero-total metrics.
-- Verify that API responses follow their documented schemas.
-
-**Deliverable:** An automated test suite with reproducible execution instructions.
-
-### Phase 5 — Deployment Readiness
-
-- Add structured application logging.
-- Configure environment-specific settings.
-- Add a health-check endpoint.
-- Configure dependency management.
-- Add Docker support as an optional extension.
-- Add CI using GitHub Actions as an optional extension.
-
-**Deliverable:** A repository ready for repeatable execution and deployment.
-
----
-
-## 5. Pareto and Decile Analysis
-
-### Objective
-
-Determine how much of the total value of a selected metric is contributed by different equally sized groups of anime.
-
-For example:
-
-- What proportion of total completions is associated with the highest-ranked 10% of anime?
-- How concentrated are favorites among the most-engaged titles?
-- Does membership show the same concentration pattern as completion counts?
-- How do results change when the number of groups changes?
-
-### Required function
-
-```python
-def pareto_analysis(
-    metric_column: str,
-    n: int = 10,
-) -> pd.Series:
-    ...
-```
-
-The function will operate on the cleaned dataset supplied by the application or its calling service.
-
-### Analytical requirements
-
-1. Sort observations by the selected metric in descending order.
-2. Rank values using `rank(method="first")` to handle ties.
-3. Use `pd.qcut()` on the ranks to divide the observations into `n` approximately equal-sized groups.
-4. Calculate each group's sum as a proportion of the overall metric total.
-5. Sort the resulting proportions in descending order.
-6. Label the output `Group 1` through `Group n`.
-7. Return a Pandas Series.
-
-### Expected result
+## 5. Architecture
 
 ```text
-Group 1    0.94...
-Group 2    0.04...
-Group 3    0.01...
-Group 4    0.00...
-Group 5    0.00...
-dtype: float64
+Client -> FastAPI routes -> Services -> Repository -> Preprocessing -> anime.csv
+                                   \-> Analytics functions (pure pandas/numpy)
 ```
 
-The values above are illustrative, not measured results.
+The CSV is read **once at startup**, cleaned and kept in memory; requests never
+touch the file. Analytics functions take a DataFrame and know nothing about
+HTTP. Details: [`docs/architecture.md`](docs/architecture.md).
 
-### Important constraints
+## 6. Repository structure
 
-- Validate the requested metric.
-- Require a positive integer for `n`.
-- Handle insufficient observations.
-- Define behavior for missing and negative metric values.
-- Prevent division by zero.
-- Verify that the group proportions sum to approximately `1.0` when the total is positive.
+```text
+anime-analytics-api/
+├── README.md
+├── LICENSE
+├── .env.example
+├── .gitignore
+├── pyproject.toml
+├── uv.lock
+├── data/
+│   ├── README.md                 how to obtain anime.csv
+│   └── html/                     sample scraped pages (unused by the API)
+├── docs/
+│   ├── architecture.md
+│   ├── data_dictionary.md
+│   └── analytical_methodology.md
+├── src/anime_analytics/
+│   ├── main.py                   app factory, startup, error handlers
+│   ├── config.py                 settings (env / .env)
+│   ├── exceptions.py
+│   ├── api/
+│   │   ├── dependencies.py
+│   │   └── routes/{anime,analytics}.py
+│   ├── schemas/{anime,analytics,common}.py
+│   ├── services/{anime_service,analytics_service}.py
+│   ├── repositories/anime_repository.py
+│   └── analytics/
+│       ├── metrics.py            supported-metric registry, shared helpers
+│       ├── preprocessing.py
+│       ├── descriptive.py
+│       ├── ranking.py
+│       ├── aggregation.py        genre / type / category
+│       ├── distribution.py
+│       ├── engagement.py
+│       └── pareto.py
+└── tests/
+```
 
-The analysis must not assume that every dataset follows the 80/20 rule. That conclusion must be evaluated from the actual results.
+## 7. Installation
 
----
+Requires Python 3.11 or newer. The commands below were run on Linux with Python
+3.13; the PowerShell variants differ only in how the environment is activated.
 
-## 6. API Specification
+**Windows PowerShell**
 
-The following endpoints define the planned interface.
+```powershell
+cd anime-analytics-api
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
 
-| Method | Endpoint | Purpose |
+If activation is blocked, run
+`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` first.
+
+**macOS / Linux**
+
+```bash
+cd anime-analytics-api
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+**With uv** (uses the committed `uv.lock`)
+
+```bash
+uv sync --extra dev
+```
+
+Then download the dataset (see [`data/README.md`](data/README.md)):
+
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Hernan4444/MyAnimelist-Database/master/data/anime.csv" -OutFile "data/anime.csv"
+```
+
+## 8. Configuration
+
+Settings come from environment variables or a `.env` file in the working
+directory. Copy the template and edit it if needed:
+
+```bash
+cp .env.example .env          # PowerShell: Copy-Item .env.example .env
+```
+
+| Variable | Default | Meaning |
 |---|---|---|
-| `GET` | `/` | API information |
-| `GET` | `/health` | Health check |
-| `GET` | `/anime` | Retrieve filtered and paginated anime |
-| `GET` | `/anime/{mal_id}` | Retrieve one anime |
-| `GET` | `/analytics/overview` | Summary statistics |
-| `GET` | `/analytics/top-anime` | Rank anime by a supported metric |
-| `GET` | `/analytics/genres` | Aggregate metrics by genre |
-| `GET` | `/analytics/distribution/{metric}` | Analyze metric distributions |
-| `GET` | `/analytics/pareto` | Calculate ranked group proportions |
+| `APP_NAME` | `Anime Analytics API` | Title shown in the API and docs |
+| `APP_ENV` | `development` | Free-text environment label (shown at `/`) |
+| `DATA_PATH` | `data/anime.csv` | Path to `anime.csv`; relative paths resolve from the working directory |
+| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL` |
 
-### Example requests
+No secrets are used. `.env` is git-ignored.
 
-Retrieve the first 20 anime:
+## 9. Running the API
+
+From the project root, with the virtual environment active:
+
+```bash
+uvicorn anime_analytics.main:app --app-dir src --reload
+```
+
+(With `pip install -e .` the `--app-dir src` option is optional.)
+Open <http://127.0.0.1:8000/docs> for the interactive documentation, or
+<http://127.0.0.1:8000/openapi.json> for the schema.
+
+Check that the dataset loaded:
+
+```bash
+curl http://127.0.0.1:8000/health
+# {"status":"ok","dataset_loaded":true,"anime_count":17562}
+```
+
+If `data/anime.csv` is missing the server still starts; `/health` returns
+`"status": "degraded"` and data endpoints return `503`.
+
+## 10. API reference
+
+Interactive documentation with every parameter is at `/docs`. Summary:
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/` | API information |
+| GET | `/health` | Health check and dataset status |
+| GET | `/anime` | List anime: filter, sort, paginate |
+| GET | `/anime/{mal_id}` | One anime by MyAnimeList id |
+| GET | `/analytics/overview` | Summary statistics and data-quality counts |
+| GET | `/analytics/top-anime` | Rank anime by a metric |
+| GET | `/analytics/genres` | Aggregate a metric by genre |
+| GET | `/analytics/types` | Compare anime types (TV, Movie, ...) |
+| GET | `/analytics/engagement` | Completion, drop and favorite rates by type |
+| GET | `/analytics/distribution/{metric}` | Percentiles, skewness, histogram |
+| GET | `/analytics/pareto` | Ranked-group concentration (Pareto/decile) |
+
+Supported metrics: `Score`, `Episodes`, `Ranked`, `Popularity`, `Members`,
+`Favorites`, `Watching`, `Completed`, `On-Hold`, `Dropped`, `Plan to Watch`
+and `Score-1` … `Score-10`. Any other name is rejected with 422. `Pareto`
+accepts only the additive count metrics (not `Score`, `Ranked` or `Popularity`).
+
+### `GET /anime`
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `anime_type` | – | Exact type, case-insensitive (`TV`, `Movie`, `OVA`, ...) |
+| `genre` | – | Exact genre name, case-insensitive (`action` matches `Action`; `act` does not) |
+| `name` | – | Case-insensitive substring of the title or English title |
+| `min_score`, `max_score` | – | 0–10, inclusive; unscored anime never match |
+| `sort_by` | `MAL_ID` | `MAL_ID`, `Name`, `Score`, `Episodes`, `Ranked`, `Popularity`, `Members`, `Favorites`, `Watching`, `Completed`, `On-Hold`, `Dropped`, `Plan to Watch` |
+| `order` | `asc` | `asc` or `desc`; missing values always sort last |
+| `limit` | 20 | 1–100 |
+| `offset` | 0 | ≥ 0 |
+
+Filters combine with AND. Records use the dataset's column names; `Genres` is
+a list and missing values are `null`.
 
 ```http
-GET /anime?limit=20&offset=0
+GET /anime?genre=Action&anime_type=TV&min_score=8&sort_by=Score&order=desc&limit=2
 ```
 
-Filter anime by type:
+```json
+{
+  "total": 114,
+  "limit": 2,
+  "offset": 0,
+  "count": 2,
+  "items": [
+    {
+      "MAL_ID": 5114,
+      "Name": "Fullmetal Alchemist: Brotherhood",
+      "Score": 9.19,
+      "Genres": ["Action", "Military", "Adventure", "Comedy", "Drama", "Magic", "Fantasy", "Shounen"],
+      "Type": "TV",
+      "Episodes": 64,
+      "...": "remaining fields omitted here"
+    }
+  ]
+}
+```
+
+(The example is abridged; `total` and the first item are from the dataset
+checked while building this project and may differ with another copy.)
+
+### `GET /analytics/top-anime`
+
+`metric` (default `Members`), `limit` (1–100, default 10), `order` (`asc` or
+`desc`; defaults to `desc`, or `asc` for `Ranked`/`Popularity` where lower is
+better). Anime with no value for the metric are excluded.
 
 ```http
-GET /anime?anime_type=TV&limit=20
+GET /analytics/top-anime?metric=Members&limit=3
 ```
 
-Retrieve anime by MAL identifier:
+```json
+{
+  "metric": "Members", "order": "desc", "limit": 3, "count": 3,
+  "items": [
+    {"rank": 1, "mal_id": 1535, "name": "Death Note", "type": "TV", "value": 2589552.0},
+    {"rank": 2, "mal_id": 16498, "name": "Shingeki no Kyojin", "type": "TV", "value": 2531397.0},
+    {"rank": 3, "mal_id": 5114, "name": "Fullmetal Alchemist: Brotherhood", "type": "TV", "value": 2248456.0}
+  ]
+}
+```
+
+### `GET /analytics/genres` and `/analytics/types`
+
+`metric`, `sort_by` (`total`, `mean`, `median`, `anime_count`; default `total`
+for count metrics and `mean` for `Score`/rank metrics), `order`, `min_anime`.
+`/analytics/genres` also takes `limit` (1–200, default 50). An anime is
+counted in full for every genre it lists, so genre totals exceed the dataset
+total. `total` is `null` for non-additive metrics.
+
+### `GET /analytics/distribution/{metric}`
+
+`bins` (1–100, default 10). Returns count, missing, min, max, mean, median,
+standard deviation, percentiles (`p25` … `p99`), skewness, excess kurtosis and
+an equal-width histogram.
+
+### `GET /analytics/engagement`
+
+`min_members` (default 0) excludes small audiences. Returns, per type, the
+number of titles, total members and the mean completion, drop and favorite
+rates (definitions in the data dictionary).
+
+## 11. Pareto analysis
 
 ```http
-GET /anime/1
+GET /analytics/pareto?metric=Completed&n=5
 ```
-
-Rank anime by members:
-
-```http
-GET /analytics/top-anime?metric=Members&limit=10
-```
-
-Perform decile analysis:
-
-```http
-GET /analytics/pareto?metric=Completed&n=10
-```
-
-Interactive documentation will be available at:
-
-```text
-/docs
-```
-
-The final endpoint parameters and response schemas must match the implemented code.
-
----
-
-## 7. Example API Response
-
-An illustrative Pareto response could look like this:
 
 ```json
 {
   "metric": "Completed",
   "groups": 5,
+  "observations": 17562,
+  "excluded_missing": 0,
+  "total": 388042424.0,
   "results": [
-    {"group": "Group 1", "proportion": 0.94},
-    {"group": "Group 2", "proportion": 0.04},
-    {"group": "Group 3", "proportion": 0.01},
-    {"group": "Group 4", "proportion": 0.006},
-    {"group": "Group 5", "proportion": 0.004}
+    {"group": "Group 1", "proportion": 0.94586, "cumulative_proportion": 0.94586},
+    {"group": "Group 2", "proportion": 0.04400, "cumulative_proportion": 0.98986},
+    {"group": "Group 3", "proportion": 0.00823, "cumulative_proportion": 0.99809},
+    {"group": "Group 4", "proportion": 0.00157, "cumulative_proportion": 0.99965},
+    {"group": "Group 5", "proportion": 0.00035, "cumulative_proportion": 1.00000}
   ]
 }
 ```
 
-The numbers are placeholders. Actual values must be calculated from the dataset.
+(Values shown rounded; these are real results for the dataset checked.)
 
----
+The anime are ranked by the metric (`rank(method="first")`, so ties get
+distinct ranks), split into `n` almost equal-sized groups with `pd.qcut`, and
+each group's sum is divided by the overall total. Groups are equal in *number
+of anime*, not in share of the metric, and nothing assumes an 80/20 outcome:
+in this dataset the top 10% of titles hold about 84% of all completions.
 
-## 8. Architecture
+As a library function:
 
-The application will follow a layered architecture.
+```python
+from anime_analytics.analytics.pareto import calculate_pareto
 
-```text
-Client
-  |
-  v
-FastAPI Routes
-  |
-  v
-Request Validation and Response Schemas
-  |
-  v
-Service Layer
-  |
-  +-------------------+
-  |                   |
-  v                   v
-Anime Repository   Analytics Engine
-  |                   |
-  v                   v
-Cleaned Dataset   Statistical Functions
+shares = calculate_pareto(df, "Completed", n=10)  # pandas Series, sums to 1.0
 ```
 
-### Architectural responsibilities
+Edge cases (invalid `n`, unknown metric, too few observations, missing,
+negative or all-zero values, empty data) and the exact algorithm are
+documented in [`docs/analytical_methodology.md`](docs/analytical_methodology.md).
 
-- **API routes:** Handle HTTP requests and responses.
-- **Schemas:** Validate inputs and define response structures.
-- **Services:** Coordinate application operations.
-- **Repository:** Provide access to the loaded anime data.
-- **Analytics engine:** Execute statistical and analytical functions.
-- **Preprocessing:** Validate and clean source data.
-- **Tests:** Verify expected behavior independently of production data.
+## 12. Error handling
 
-This separation prevents analytical logic from becoming tightly coupled to individual endpoints.
-
----
-
-## 9. Repository Structure
-
-The repository will use a modular Python package with no notebook directory.
-
-```text
-anime-analytics-api/
-│
-├── README.md
-├── LICENSE
-├── .gitignore
-├── .env.example
-├── pyproject.toml
-├── uv.lock
-│
-├── data/
-│   └── README.md
-│
-├── src/
-│   └── anime_analytics/
-│       ├── __init__.py
-│       ├── main.py
-│       ├── config.py
-│       │
-│       ├── api/
-│       │   ├── __init__.py
-│       │   └── routes/
-│       │       ├── __init__.py
-│       │       ├── anime.py
-│       │       └── analytics.py
-│       │
-│       ├── schemas/
-│       │   ├── __init__.py
-│       │   ├── anime.py
-│       │   └── analytics.py
-│       │
-│       ├── services/
-│       │   ├── __init__.py
-│       │   ├── anime_service.py
-│       │   └── analytics_service.py
-│       │
-│       ├── repositories/
-│       │   ├── __init__.py
-│       │   └── anime_repository.py
-│       │
-│       └── analytics/
-│           ├── __init__.py
-│           ├── preprocessing.py
-│           ├── descriptive.py
-│           ├── aggregation.py
-│           └── pareto.py
-│
-├── tests/
-│   ├── conftest.py
-│   ├── test_preprocessing.py
-│   ├── test_anime_api.py
-│   ├── test_analytics.py
-│   └── test_pareto.py
-│
-└── docs/
-    ├── architecture.md
-    ├── data_dictionary.md
-    └── analytical_methodology.md
-```
-
-### Structure principles
-
-- No Jupyter notebooks.
-- No business logic inside the README.
-- No unnecessary abstractions for a small initial application.
-- Keep functions small, typed, testable, and reusable.
-- Use synthetic fixtures for tests instead of depending entirely on the full dataset.
-- Introduce a database only if the requirements justify it.
-
----
-
-## 10. Technology Stack
-
-| Technology | Responsibility |
+| Status | When |
 |---|---|
-| Python 3.11+ | Application language |
-| Pandas | Data transformation and aggregation |
-| NumPy | Numerical computation |
-| FastAPI | REST API framework |
-| Pydantic | Validation and serialization |
-| Uvicorn | ASGI server |
-| Pytest | Automated testing |
-| HTTPX | API integration testing |
-| Ruff | Linting and formatting |
-| Mypy | Static type checking |
-| Git | Version control |
-| GitHub Actions | Optional continuous integration |
-| Docker | Optional containerization |
+| 200 | Success. Pages past the end of the data return an empty `items` list. |
+| 400 | Parameters are valid but the analysis cannot run (for example more Pareto groups than observations). |
+| 404 | Unknown `mal_id`. |
+| 422 | Invalid parameter: wrong type, out of range, unsupported metric or sort field, `min_score > max_score`. |
+| 503 | The dataset is not loaded. |
 
-Use a compatible, locked dependency set rather than assuming every latest package version will work together.
+Every error body is `{"detail": ...}`. Responses never contain stack traces or
+local file paths (those are logged server-side only), and never contain `NaN`
+or `Infinity`: missing numbers are `null`.
 
----
+## 13. Testing and code quality
 
-## 11. Setup and Execution
-
-### Prerequisites
-
-- Python 3.11 or a compatible supported version.
-- Git.
-- A local copy of the anime metadata CSV.
-- A virtual environment or dependency manager.
-
-### Install dependencies
-
-If using `pip`:
+Run from the project root with the virtual environment active.
 
 ```bash
-pip install fastapi uvicorn pandas numpy pydantic pytest httpx
+pytest                      # all tests
+pytest -m "not integration" # only the fast synthetic-data tests
+ruff check .                # lint
+ruff format --check .       # formatting
+mypy src/                   # static types
 ```
 
-### Start the API
+The unit tests use a small synthetic table whose expected values are worked
+out by hand (`tests/conftest.py`). Tests marked `integration` run against the
+real `anime.csv` and are **skipped automatically** if it is not found at
+`DATA_PATH` / `data/anime.csv`.
 
-From the project root, after implementing the application entry point:
+Results when this version was finished (Python 3.13, pandas 3.0, FastAPI 0.143):
 
-```bash
-uvicorn anime_analytics.main:app --reload --app-dir src
-```
+| Command | Result |
+|---|---|
+| `pytest` with `data/anime.csv` present | 253 passed |
+| `pytest` without the dataset | 219 passed, 34 skipped |
+| `ruff check .` | All checks passed |
+| `ruff format --check .` | No files to reformat |
+| `mypy src/` | No issues in 27 source files |
 
-Open the interactive API documentation:
+Only `src/` is type-checked; the tests are not annotated. Python 3.11 and 3.12
+were not available in the environment used, so they have not been tested
+(the code targets `>=3.11`).
 
-```text
-http://127.0.0.1:8000/docs
-```
+## 14. Data limitations
 
-### Run tests
+- The data is a **2020/early-2021 snapshot** of MyAnimeList, not live data.
+- `Members`, `Completed`, etc. count **MyAnimeList list entries**, not viewers
+  or streams, and reflect MyAnimeList's user base only.
+- About 29% of titles have no `Score`; they are excluded from score
+  statistics rather than treated as zero.
+- `Popularity` and `Ranked` are ranks (lower is better), not quantities, and are
+  not comparable with counts.
+- Genre totals double-count multi-genre titles by design.
+- Correlation in these aggregates is not evidence of causation.
 
-```bash
-pytest -v
-```
+## 15. Future extensions
 
-### Run code-quality checks
+Not implemented; possible next steps:
 
-After configuring Ruff and Mypy:
+- Docker image and GitHub Actions CI.
+- Persistence in PostgreSQL via SQLAlchemy.
+- Studio-level benchmarking and genre co-occurrence analysis.
+- Content-based recommendation using synopsis similarity.
+- Response caching and performance benchmarking.
 
-```bash
-ruff check .
-ruff format --check .
-mypy src/
-```
+## 16. License and attribution
 
-These commands are intended for the completed implementation. The project configuration and package installation must be set up before all commands will work.
+Code: MIT License, see [`LICENSE`](LICENSE).
 
----
-
-## 12. Functional Requirements
-
-### Data engineering
-
-- [ ] Load and validate the source CSV.
-- [ ] Validate required columns and data types.
-- [ ] Document missing-value policies.
-- [ ] Detect duplicate identifiers.
-- [ ] Handle invalid metric values.
-- [ ] Keep raw data separate from application code.
-
-### Analytical engine
-
-- [ ] Implement descriptive statistics.
-- [ ] Implement top-anime rankings.
-- [ ] Implement genre-level aggregations.
-- [ ] Implement type-level comparisons.
-- [ ] Implement metric distribution analysis.
-- [ ] Implement generalized Pareto analysis.
-- [ ] Test ties, missing values, and zero-total cases.
-
-### API engineering
-
-- [ ] Implement anime retrieval and identifier lookup.
-- [ ] Implement filtering and pagination.
-- [ ] Implement analytics endpoints.
-- [ ] Define request and response schemas.
-- [ ] Return appropriate HTTP status codes.
-- [ ] Generate accurate OpenAPI documentation.
-
-### Quality assurance
-
-- [ ] Write unit tests.
-- [ ] Write API integration tests.
-- [ ] Configure structured logging.
-- [ ] Add type hints.
-- [ ] Configure linting and formatting.
-- [ ] Document setup and execution.
-
----
-
-## 13. Non-Functional Requirements
-
-### Reliability
-
-The API must validate user inputs and return predictable errors rather than exposing unhandled exceptions.
-
-### Maintainability
-
-Routes, analytical functions, preprocessing, and data access must remain separated.
-
-### Performance
-
-The initial implementation should load and preprocess the dataset efficiently, avoid unnecessary repeated CSV reads, and paginate large responses.
-
-### Reproducibility
-
-Data-cleaning rules, dependency versions, analytical assumptions, and test procedures must be documented.
-
-### Security
-
-Do not expose local filesystem paths, stack traces, credentials, or sensitive configuration through API responses.
-
-### Interpretability
-
-Statistical results should be accompanied by clear metric definitions and limitations.
-
----
-
-## 14. Engineering Constraints
-
-1. Popularity is a rank; members and completions are counts. Do not interpret them as equivalent quantities.
-2. Document the treatment of missing and invalid metric values.
-3. Reject unsupported metric names and invalid group counts.
-4. Do not silently modify the source dataset.
-5. Prevent division by zero in proportion calculations.
-6. Do not infer causation from correlations.
-7. Do not claim that the dataset measures current streaming viewership.
-8. Avoid loading additional large CSV files until they are needed.
-9. Keep generated artifacts and large source files out of version control when appropriate.
-10. Do not claim deployment, test coverage, or production readiness without evidence.
-
----
-
-## 15. Definition of Done
-
-The project is complete when:
-
-- The application starts from a clean environment.
-- The dataset is loaded and validated using documented rules.
-- All required endpoints work as specified.
-- Pareto analysis produces mathematically valid results.
-- Invalid inputs are handled consistently.
-- Automated tests pass.
-- Code-quality checks run successfully.
-- API documentation reflects actual behavior.
-- Another developer can reproduce the application using the README.
-
----
-
-## 16. Future Extensions
-
-Possible extensions include:
-
-- PostgreSQL integration.
-- SQLAlchemy-based persistence.
-- Content-based anime recommendation.
-- Synopsis similarity analysis.
-- Genre and studio benchmarking.
-- Interactive frontend development.
-- Docker deployment.
-- GitHub Actions CI.
-- API performance benchmarking.
-- Data-quality monitoring.
-
-These extensions are optional and should be added only after the core application is stable.
-
----
-
-## 17. Dataset Attribution
-
-The project uses the MyAnimeList Database 2020 dataset.
-
-- [Original repository](https://github.com/Hernan4444/MyAnimelist-Database)
-- [Kaggle dataset](https://www.kaggle.com/datasets/hernan4444/anime-recommendation-database-2020)
-
-Review the original source terms and applicable permissions before redistributing dataset files. Clearly distinguish third-party data from original code and analysis.
-
----
-
-## Project Summary
-
-Anime Analytics API is a code-first data analytics project that combines Python, Pandas, statistical analysis, and FastAPI.
-
-It demonstrates how to transform structured data into reusable analytical functions and expose those functions through a documented REST API.
-
-The project prioritizes modular architecture, reproducibility, automated testing, analytical correctness, and maintainable Python code.
-
-**Current status:** In development.
-
-**Primary goal:** Build a well-tested anime analytics service that can be extended into a production-style backend application.
+Data: the MyAnimeList Database 2020 dataset by Hernan4444, compiled from
+MyAnimeList (<https://myanimelist.net/>). It is third-party data and is not
+covered by this project's license; review the source's terms before
+redistributing it.

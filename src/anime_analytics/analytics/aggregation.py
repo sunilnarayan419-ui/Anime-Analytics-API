@@ -1,125 +1,154 @@
-"""Genre and category aggregation functions."""
+"""Genre-level and category-level aggregation."""
 
 import pandas as pd
 
+from anime_analytics.analytics.metrics import numeric_series
+from anime_analytics.exceptions import AnalysisError
 
-def aggregate_by_genre(
-    data: pd.DataFrame,
-    metric_column: str,
-) -> pd.Series:
-    """
-    Aggregate a metric by genre.
+SORT_COLUMNS = ("anime_count", "total", "mean", "median")
+_OUTPUT_COLUMNS = ["anime_count", "total", "mean", "median"]
 
-    Each anime can have multiple genres separated by commas. This function
-    splits genres and sums metrics proportionally across them.
 
-    Args:
-        data: Cleaned anime DataFrame.
-        metric_column: Numeric column to aggregate (e.g. "Completed", "Members").
+def _validate_sort(sort_by: str) -> None:
+    if sort_by not in SORT_COLUMNS:
+        raise AnalysisError(f"sort_by must be one of {list(SORT_COLUMNS)}")
 
-    Returns:
-        Series indexed by genre name, values are sums of the metric.
 
-    Raises:
-        ValueError: If columns are missing or metric has no valid data.
-    """
-    if metric_column not in data.columns:
-        raise ValueError(f"Unknown metric column: {metric_column}")
-
-    if "Genres" not in data.columns:
-        raise ValueError("Genres column not found in data")
-
-    values = pd.to_numeric(data[metric_column], errors="coerce").dropna()
-
-    if values.empty:
-        raise ValueError(f"No valid numeric values for {metric_column}")
-
-    genre_sums: dict[str, float] = {}
-
-    for _, row in data.iterrows():
-        genre_str = str(row["Genres"])
-        metric_val = row[metric_column]
-
-        # Skip NaN values
-        if pd.isna(metric_val):
-            continue
-
-        # Split genres by comma and strip whitespace
-        genres = [g.strip() for g in genre_str.split(",") if g.strip()]
-
-        if not genres:
-            continue
-
-        # Distribute the metric value equally across all listed genres
-        share = metric_val / len(genres)
-        for g in genres:
-            genre_sums[g] = genre_sums.get(g, 0.0) + share
-
-    # Sort by total in descending order
-    result = pd.Series(genre_sums).sort_values(ascending=False)
-
+def _summarise(
+    frame: pd.DataFrame,
+    key: str,
+    *,
+    sort_by: str,
+    ascending: bool,
+    min_count: int,
+) -> pd.DataFrame:
+    """Group ``frame`` (columns ``key`` and ``value``) and summarise ``value``."""
+    grouped = frame.groupby(key, sort=False)["value"].agg(
+        anime_count="count", total="sum", mean="mean", median="median"
+    )
+    grouped = grouped[grouped["anime_count"] >= min_count]
+    grouped = grouped.reset_index().sort_values(
+        [sort_by, key],
+        ascending=[ascending, True],
+        kind="mergesort",
+    )
+    result: pd.DataFrame = grouped[[key, *_OUTPUT_COLUMNS]].reset_index(drop=True)
     return result
-
-
-def aggregate_by_type(
-    data: pd.DataFrame,
-    metric_column: str,
-) -> pd.Series:
-    """
-    Aggregate a metric by anime type (TV, Movie, OVA, etc.).
-
-    Args:
-        data: Cleaned anime DataFrame.
-        metric_column: Numeric column to aggregate.
-
-    Returns:
-        Series indexed by Type, values are sums of the metric.
-
-    Raises:
-        ValueError: If columns are missing or metric has no valid data.
-    """
-    if metric_column not in data.columns:
-        raise ValueError(f"Unknown metric column: {metric_column}")
-
-    if "Type" not in data.columns:
-        raise ValueError("Type column not found in data")
-
-    values = pd.to_numeric(data[metric_column], errors="coerce").dropna()
-
-    if values.empty:
-        raise ValueError(f"No valid numeric values for {metric_column}")
-
-    return data.groupby("Type")[metric_column].sum().sort_values(ascending=False)
 
 
 def aggregate_by_category(
     data: pd.DataFrame,
     category_column: str,
     metric_column: str,
-) -> pd.Series:
-    """
-    Generic aggregation by any category column.
+    *,
+    missing_label: str = "Unknown",
+    sort_by: str = "total",
+    ascending: bool = False,
+    min_count: int = 1,
+) -> pd.DataFrame:
+    """Summarise a metric for each value of a single-valued category column.
 
-    Args:
-        data: Cleaned anime DataFrame.
-        category_column: Column to group by.
-        metric_column: Numeric column to aggregate.
+    Rows with a missing category are grouped under ``missing_label`` rather
+    than dropped. Rows with a missing metric value are excluded.
 
     Returns:
-        Series indexed by category, values are sums of the metric.
+        DataFrame with the category column plus ``anime_count`` (rows with a
+        valid metric), ``total``, ``mean`` and ``median``.
 
     Raises:
-        ValueError: If columns are missing or invalid.
+        AnalysisError: For unknown columns, an invalid ``sort_by`` or when no
+            valid metric values exist.
     """
-    if metric_column not in data.columns:
-        raise ValueError(f"Unknown metric column: {metric_column}")
-
+    _validate_sort(sort_by)
     if category_column not in data.columns:
-        raise ValueError(f"Unknown category column: {category_column}")
+        raise AnalysisError(f"Unknown category column: {category_column}")
 
-    values = pd.to_numeric(data[metric_column], errors="coerce").dropna()
+    values = numeric_series(data, metric_column)
+    frame = pd.DataFrame(
+        {
+            category_column: data[category_column]
+            .astype("string")
+            .fillna(missing_label),
+            "value": values,
+        }
+    ).dropna(subset=["value"])
 
-    if values.empty:
-        raise ValueError(f"No valid numeric values for {metric_column}")
+    if frame.empty:
+        raise AnalysisError(f"No valid numeric values for {metric_column}")
 
-    return data.groupby(category_column)[metric_column].sum().sort_values(ascending=False)
+    return _summarise(
+        frame,
+        category_column,
+        sort_by=sort_by,
+        ascending=ascending,
+        min_count=min_count,
+    )
+
+
+def aggregate_by_type(
+    data: pd.DataFrame,
+    metric_column: str,
+    *,
+    sort_by: str = "total",
+    ascending: bool = False,
+    min_count: int = 1,
+) -> pd.DataFrame:
+    """Compare anime formats (TV, Movie, OVA, ...) on a metric."""
+    return aggregate_by_category(
+        data,
+        "Type",
+        metric_column,
+        sort_by=sort_by,
+        ascending=ascending,
+        min_count=min_count,
+    )
+
+
+def aggregate_by_genre(
+    data: pd.DataFrame,
+    metric_column: str,
+    *,
+    sort_by: str = "total",
+    ascending: bool = False,
+    min_count: int = 1,
+) -> pd.DataFrame:
+    """Summarise a metric for each genre.
+
+    ``Genres`` holds a comma-separated list. Each anime is counted **in full**
+    for every genre it lists, so one title with three genres appears in three
+    rows and genre totals add up to more than the dataset total. Titles with
+    no genre information are left out.
+
+    Returns:
+        DataFrame with ``genre``, ``anime_count``, ``total``, ``mean`` and
+        ``median``.
+
+    Raises:
+        AnalysisError: For unknown columns, an invalid ``sort_by`` or when no
+            valid metric values exist.
+    """
+    _validate_sort(sort_by)
+    if "Genres" not in data.columns:
+        raise AnalysisError("Genres column not found in data")
+
+    values = numeric_series(data, metric_column)
+    frame = pd.DataFrame(
+        {
+            "genre": data["Genres"].astype("string").str.split(","),
+            "value": values,
+        }
+    ).dropna(subset=["value"])
+    frame = frame.explode("genre")
+    frame["genre"] = frame["genre"].astype("string").str.strip()
+    frame = frame[frame["genre"].fillna("").str.len() > 0]
+
+    if frame.empty:
+        raise AnalysisError(f"No valid numeric values for {metric_column}")
+
+    return _summarise(
+        frame,
+        "genre",
+        sort_by=sort_by,
+        ascending=ascending,
+        min_count=min_count,
+    )

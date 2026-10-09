@@ -1,6 +1,9 @@
-"""Pareto analysis for metric distribution across ranked groups."""
+"""Pareto (ranked-group concentration) analysis."""
 
 import pandas as pd
+
+from anime_analytics.analytics.metrics import numeric_series, validate_positive_int
+from anime_analytics.exceptions import AnalysisError
 
 
 def calculate_pareto(
@@ -8,71 +11,69 @@ def calculate_pareto(
     metric_column: str,
     n: int = 10,
 ) -> pd.Series:
-    """
-    Perform Pareto analysis by dividing ranked observations into groups.
+    """Split ranked observations into ``n`` groups and report each group's share.
 
-    The function:
-    1. Sorts observations by the metric in descending order.
-    2. Ranks values using rank(method="first") for tie-breaking.
-    3. Divides observations into n equal-sized groups using pd.qcut.
-    4. Calculates each group's metric sum as a proportion of total.
-    5. Returns proportions sorted descending.
+    Algorithm:
+        1. Keep rows with a valid numeric value; sort them by the metric in
+           descending order.
+        2. Rank them with ``rank(method="first", ascending=False)`` so tied
+           values still get distinct ranks.
+        3. Cut the ranks into ``n`` approximately equal-sized groups with
+           ``pd.qcut``.
+        4. Divide each group's sum by the overall total.
+        5. Sort the proportions in descending order and label them
+           ``Group 1`` .. ``Group n``.
+
+    The groups hold (almost) the same *number of anime*, not the same share
+    of the metric. The result shows how concentrated the metric is; it does
+    not assume or guarantee an 80/20 split. Because labels are assigned after
+    sorting by proportion, ``Group 1`` is always the largest share. This only
+    differs from rank order when tied values make a lower-ranked group larger
+    (for example a middle group that received one extra row).
+
+    Missing and non-numeric values are excluded, not treated as zero.
 
     Args:
-        anime_data: Cleaned anime DataFrame.
-        metric_column: Column name with numeric values.
-        n: Number of groups for decile analysis.
+        anime_data: DataFrame containing the metric column.
+        metric_column: Name of a numeric column.
+        n: Number of groups (positive integer, at most the number of valid
+            observations).
 
     Returns:
-        Series with "Group 1" through "Group n" labels and proportions.
+        Series indexed ``Group 1`` .. ``Group n`` whose values sum to 1.0.
 
     Raises:
-        ValueError: For invalid parameters, unknown columns, or data issues.
+        AnalysisError: For an invalid ``n``, an unknown column, an empty
+            dataset or no valid values, negative values, fewer valid
+            observations than groups, or a total of zero.
     """
-    # Validate n
-    if not isinstance(n, int) or isinstance(n, bool) or n < 1:
-        raise ValueError("n must be a positive integer")
+    n = validate_positive_int(n, "n")
 
-    # Validate metric column exists
-    if metric_column not in anime_data.columns:
-        raise ValueError(f"Unknown metric column: {metric_column}")
+    values = numeric_series(anime_data, metric_column)
+    if anime_data.empty:
+        raise AnalysisError("The dataset is empty")
 
-    # Convert to numeric, which will produce NaN for "Unknown" values
-    values = pd.to_numeric(anime_data[metric_column], errors="coerce")
+    valid = values.dropna()
+    if valid.empty:
+        raise AnalysisError(f"No valid numeric values for {metric_column}")
+    if (valid < 0).any():
+        raise AnalysisError("Metric values must be non-negative for Pareto analysis")
+    if len(valid) < n:
+        raise AnalysisError(
+            f"Cannot form {n} groups from {len(valid)} valid observations"
+        )
 
-    # Drop NaN values (not raise error - just filter them out)
-    valid_values = values.dropna()
-
-    if valid_values.empty:
-        raise ValueError(f"No valid numeric values for {metric_column}")
-
-    # Check for negative values (not meaningful for Pareto)
-    if (valid_values < 0).any():
-        raise ValueError("Metric values must be non-negative")
-
-    # Check we have enough observations
-    if len(valid_values) < n:
-        raise ValueError("Number of observations must be at least n")
-
-    total = valid_values.sum()
-
-    # Handle zero total case
+    total = float(valid.sum())
     if total <= 0:
-        raise ValueError("Metric total must be positive")
+        raise AnalysisError("The metric total must be positive")
 
-    # Rank in descending order (highest gets rank 1)
-    ranks = valid_values.rank(method="first", ascending=False)
+    ordered = valid.sort_values(ascending=False, kind="mergesort")
+    ranks = ordered.rank(method="first", ascending=False)
+    # Plain arrays avoid any index-alignment problems if the index has duplicates.
+    group_ids = pd.qcut(ranks.to_numpy(), q=n, labels=False)
 
-    # Divide into n equal-sized groups
-    groups = pd.qcut(ranks, q=n, labels=False, duplicates="drop")
-
-    # Calculate each group's sum as proportion of total
-    proportions = valid_values.groupby(groups, sort=False).sum() / total
-
-    # Sort proportions descending
-    proportions = proportions.sort_values(ascending=False)
-
-    # Rename index to "Group 1", "Group 2", etc.
-    proportions.index = [f"Group {i + 1}" for i in range(len(proportions))]
-
-    return proportions
+    proportions = ordered.groupby(group_ids, sort=True).sum() / total
+    proportions = proportions.sort_values(ascending=False, kind="mergesort")
+    proportions.index = pd.Index([f"Group {i}" for i in range(1, n + 1)])
+    proportions.name = metric_column
+    return proportions.astype("float64")
